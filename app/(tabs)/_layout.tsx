@@ -1,19 +1,11 @@
 import { SymbolView } from 'expo-symbols';
-import { Link, Redirect, Tabs } from 'expo-router';
+import { Link, Tabs } from 'expo-router';
 import { Pressable } from 'react-native';
 
 import { COLORS } from '@/constants/Colors';
-import { useAppContext } from '@/context/AppContext';
 import { CustomTabBar } from '@/components/ui/PareaBottomNavigation';
 
 export default function TabLayout() {
-  const { isOnboardingCompleted } = useAppContext();
-
-  // Redirect to onboarding if not completed
-  if (!isOnboardingCompleted) {
-    return <Redirect href="/onboarding" />;
-  }
-
   return (
     <Tabs
       screenOptions={{

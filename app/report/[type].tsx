@@ -1,6 +1,7 @@
 import { StyleSheet, View, Text, ScrollView, Pressable, TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import COLORS from '@/constants/Colors';
 import LAYOUT from '@/constants/layout';
 import { useState } from 'react';
@@ -10,6 +11,7 @@ export default function ReportScreen() {
   const router = useRouter();
   const { type, id } = useLocalSearchParams();
   const { addReport } = useAppContext();
+  const { user } = useAuth();
   const { showDialog } = useDialog();
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [description, setDescription] = useState('');
@@ -33,6 +35,16 @@ export default function ReportScreen() {
       return;
     }
 
+    // Check if user is authenticated before submitting report
+    if (!user?.id) {
+      showDialog({
+        title: 'Σφάλμα',
+        message: 'Πρέπει να είσαι συνδεδεμένος/η για να υποβάλεις αναφορά',
+        type: 'error',
+      });
+      return;
+    }
+
     // Create a new report
     const newReport = {
       id: Math.random().toString(36).substring(7),
@@ -40,7 +52,7 @@ export default function ReportScreen() {
       targetId: id as string,
       reason: selectedReason as any,
       description: description || undefined,
-      reporterId: 'currentUserId', // In a real app, this would be the actual user ID
+      reporterId: user.id.toString(), // Use authenticated user ID
       timestamp: new Date(),
     };
 

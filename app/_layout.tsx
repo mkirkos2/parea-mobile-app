@@ -9,6 +9,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AppProvider } from '@/context/AppContext';
 import { DialogProvider } from '@/components/ui/PareaDialog';
+import { AuthProvider } from '@/context/AuthContext';
 
 
 
@@ -55,17 +56,20 @@ function RootLayoutNav() {
 
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <DialogProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-            </Stack>
-          </ThemeProvider>
-        </DialogProvider>
-      </AppProvider>
+      <AuthProvider>
+        <AppProvider>
+          <DialogProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+              </Stack>
+            </ThemeProvider>
+          </DialogProvider>
+        </AppProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

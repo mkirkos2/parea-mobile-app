@@ -12,6 +12,9 @@ interface AppContextType {
   isOnboardingCompleted: boolean;
   setIsOnboardingCompleted: (completed: boolean) => void;
   
+  // App loading state
+  isHydrated: boolean;
+  
   // Events state
   events: Event[];
   setEvents: (events: Event[]) => void;
@@ -49,7 +52,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   // Onboarding state
-  const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
+  const [isOnboardingCompleted, setIsOnboardingCompletedBase] = useState(false);
+  
+  // Wrapper function to persist onboarding completion
+  const setIsOnboardingCompleted = async (completed: boolean) => {
+    try {
+      if (completed) {
+        await AsyncStorage.setItem('@parea/onboardingCompleted', 'true');
+      } else {
+        await AsyncStorage.removeItem('@parea/onboardingCompleted');
+      }
+      setIsOnboardingCompletedBase(completed);
+    } catch (error) {
+      console.error('Error saving onboarding completion status:', error);
+    }
+  };
   
   // Events state
   const [events, setEvents] = useState<Event[]>([]);
@@ -62,6 +79,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   
   // Created events
   const [createdEvents, setCreatedEvents] = useState<Event[]>([]);
+  const [isCreatedEventsHydrated, setIsCreatedEventsHydrated] = useState(false);
+  
+  // App hydration state
+  const [isHydrated, setIsHydrated] = useState(false);
   
   // Chat messages
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -117,7 +138,29 @@ const loadData = async () => {
             } else {
               // Validate that it's an array of Event objects
               if (Array.isArray(parsedEvents)) {
-                setCreatedEvents(parsedEvents);
+                // Normalize events to ensure they have all required fields
+                const normalizedEvents = parsedEvents.map(event => ({
+                  // Provide default values for all required fields
+                  id: event.id || Math.random().toString(36).substring(7),
+                  title: event.title || 'Χωρίς Τίτλο',
+                  description: event.description || '',
+                  category: event.category || 'coffee',
+                  date: event.date ? new Date(event.date) : new Date(),
+                  time: event.time || '12:00',
+                  duration: typeof event.duration === 'number' ? event.duration : 60,
+                  area: event.area || '',
+                  meetingPoint: event.meetingPoint || '',
+                  attendees: Array.isArray(event.attendees) ? event.attendees : [],
+                  capacity: typeof event.capacity === 'number' ? event.capacity : 10,
+                  host: event.host || '',
+                  participationMode: event.participationMode || 'open',
+                  firstTimeFriendly: typeof event.firstTimeFriendly === 'boolean' ? event.firstTimeFriendly : false,
+                  mostlySolo: typeof event.mostlySolo === 'boolean' ? event.mostlySolo : true,
+                  cost: typeof event.cost === 'number' ? event.cost : 0,
+                  requirements: Array.isArray(event.requirements) ? event.requirements : [],
+                  createdAt: event.createdAt ? new Date(event.createdAt) : new Date(),
+                }));
+                setCreatedEvents(normalizedEvents);
               } else {
                 setCreatedEvents([]);
               }
@@ -127,6 +170,11 @@ const loadData = async () => {
             setCreatedEvents([]);
           }
         }
+        // Mark created events as hydrated
+        setIsCreatedEventsHydrated(true);
+        
+        // Mark overall app context as hydrated
+        setIsHydrated(true);
         
         const storedMessages = await AsyncStorage.getItem('@parea/messages');
         if (storedMessages) {
@@ -178,8 +226,13 @@ const loadData = async () => {
     saveParticipations();
   }, [participations]);
 
-// Save created events to AsyncStorage whenever they change
+  // Save created events to AsyncStorage whenever they change
   useEffect(() => {
+    // Don't save if not hydrated yet to prevent overwriting stored data with empty array
+    if (!isCreatedEventsHydrated) {
+      return;
+    }
+    
     const saveCreatedEvents = async () => {
       try {
         await AsyncStorage.setItem('@parea/createdEvents', JSON.stringify(createdEvents));
@@ -189,7 +242,7 @@ const loadData = async () => {
     };
     
     saveCreatedEvents();
-  }, [createdEvents]);
+  }, [createdEvents, isCreatedEventsHydrated]);
   
   // Save messages to AsyncStorage whenever they change
   useEffect(() => {
@@ -239,7 +292,7 @@ const loadData = async () => {
       // Add user to attendees
       setEvents(prev => prev.map(e => 
         e.id === eventId 
-          ? { ...e, attendees: [...e.attendees, 'currentUserId'] } 
+          ? { ...e, attendees: [...e.attendees, ''] } 
           : e
       ));
     } 
@@ -263,7 +316,7 @@ const loadData = async () => {
     // Remove user from attendees
     setEvents(prev => prev.map(e => 
       e.id === eventId 
-        ? { ...e, attendees: e.attendees.filter(id => id !== 'currentUserId') } 
+        ? { ...e, attendees: e.attendees.filter(id => id !== '') } 
         : e
     ));
   };
@@ -289,15 +342,14 @@ const loadData = async () => {
   };
 
   // Reset all demo data
-const resetDemoData = async () => {
+  const resetDemoData = async () => {
     try {
-      await AsyncStorage.removeItem('@parea/onboardingCompleted');
+      // Clear all AsyncStorage data except onboarding
       await AsyncStorage.removeItem('@parea/favorites');
       await AsyncStorage.removeItem('@parea/participations');
       await AsyncStorage.removeItem('@parea/createdEvents');
       await AsyncStorage.removeItem('@parea/messages');
       
-      setIsOnboardingCompleted(false);
       setFavorites([]);
       setParticipations({});
       setCreatedEvents([]);
@@ -320,6 +372,7 @@ const resetDemoData = async () => {
       setCurrentUser,
       isOnboardingCompleted,
       setIsOnboardingCompleted,
+      isHydrated,
       events,
       setEvents,
       addEvent,

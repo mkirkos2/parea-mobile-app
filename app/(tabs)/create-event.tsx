@@ -1,6 +1,7 @@
 import { StyleSheet, View, Text, ScrollView, Pressable, TextInput, Switch, Modal, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import COLORS from '@/constants/Colors';
 import LAYOUT from '@/constants/layout';
 import { EventFormData } from '@/types';
@@ -13,6 +14,7 @@ import { useDialog } from '@/components/ui/PareaDialog';
 export default function CreateEventScreen() {
   const router = useRouter();
   const { addEvent, addCreatedEvent } = useAppContext();
+  const { user } = useAuth();
   const { showDialog } = useDialog();
   const [formData, setFormData] = useState<EventFormData>({
     title: '',
@@ -195,13 +197,23 @@ export default function CreateEventScreen() {
       .map(req => req.trim())
       .filter(req => req.length > 0);
 
+    // Check if user is authenticated before creating event
+    if (!user?.id) {
+      showDialog({
+        title: 'Σφάλμα',
+        message: 'Πρέπει να είσαι συνδεδεμένος/η για να δημιουργήσεις event',
+        type: 'error',
+      });
+      return;
+    }
+
     // Create new event with a random ID
     const newEvent = {
       id: Math.random().toString(36).substring(7),
       ...formData,
       requirements: requirementsArray,
       attendees: [],
-      host: 'currentUserId', // In a real app, this would be the actual user ID
+      host: user.id.toString(), // Use authenticated user ID
       createdAt: new Date(),
     };
 

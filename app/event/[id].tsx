@@ -1,6 +1,7 @@
 import { StyleSheet, View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import COLORS from '@/constants/Colors';
 import LAYOUT from '@/constants/layout';
 import CATEGORIES from '@/constants/categories';
@@ -11,6 +12,7 @@ export default function EventDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { events, favorites, toggleFavorite, participations, joinEvent, cancelParticipation } = useAppContext();
+  const { user } = useAuth();
   const { showDialog } = useDialog();
   
   // Find the event by ID
@@ -64,7 +66,7 @@ export default function EventDetailScreen() {
   // Handle chat access
   const handleChatAccess = () => {
     // Check if user can access chat
-    const canAccessChat = participationStatus === 'approved' || event.host === 'currentUserId';
+    const canAccessChat = participationStatus === 'approved' || (user?.id && event.host === user.id.toString());
     
     if (canAccessChat) {
       router.push(`/chat/${event.id}`);
@@ -139,10 +141,16 @@ export default function EventDetailScreen() {
         <Text style={styles.hostLabel}>Διοργανωτής</Text>
         <View style={styles.hostInfo}>
           <View style={styles.hostAvatar}>
-            <Text style={styles.hostAvatarText}>Α</Text>
+            <Text style={styles.hostAvatarText}>{event.host.charAt(0).toUpperCase()}</Text>
           </View>
           <View>
-            <Text style={styles.hostName}>Αλέξης</Text>
+            <Text style={styles.hostName}>
+              {user?.id && event.host === user.id.toString() 
+                ? user.name || 'Εσύ' 
+                : event.host.startsWith('host') 
+                ? 'Διοργανωτής' 
+                : event.host}
+            </Text>
             <View style={styles.verifiedBadge}>
               <Text style={styles.verifiedBadgeText}>Verified</Text>
             </View>

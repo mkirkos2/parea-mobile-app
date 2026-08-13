@@ -16,7 +16,7 @@ export default function ProfileScreen() {
       confirmText: 'Επαναφορά',
       cancelText: 'Ακύρωση',
       onConfirm: async () => {
-        setIsOnboardingCompleted(false);
+        await setIsOnboardingCompleted(false);
         showDialog({
           title: 'Επιτυχία',
           message: 'Το onboarding επαναφέρθηκε επιτυχώς',
@@ -26,7 +26,7 @@ export default function ProfileScreen() {
       onCancel: () => {}, // Do nothing on cancel
     });
   };
-  
+
   const handleClearDemoData = () => {
     showDialog({
       title: 'Καθαρισμός Δεδομένων',

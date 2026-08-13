@@ -3,31 +3,33 @@ import { Link } from 'expo-router';
 import COLORS from '@/constants/Colors';
 import LAYOUT from '@/constants/layout';
 import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { Event } from '@/types';
 import CATEGORIES from '@/constants/categories';
 
 export default function MyEventsScreen() {
   const { events, participations, createdEvents } = useAppContext();
+  const { user } = useAuth();
   
   // Upcoming events (approved participations)
-  const upcomingEvents = events.filter(event => 
-    participations[event.id] === 'approved' && new Date(event.date) >= new Date()
-  );
+  const upcomingEvents = events
+    .filter(event => participations[event.id] === 'approved' && new Date(event.date) >= new Date())
+    .filter((event, index, self) => self.findIndex(e => e.id === event.id) === index); // Remove duplicates
   
   // Pending requests
-  const pendingRequests = events.filter(event => 
-    participations[event.id] === 'pending'
-  );
+  const pendingRequests = events
+    .filter(event => participations[event.id] === 'pending')
+    .filter((event, index, self) => self.findIndex(e => e.id === event.id) === index); // Remove duplicates
   
-  // Hosting events
-  const hostingEvents = [...events, ...createdEvents].filter(event => 
-    createdEvents.some(ce => ce.id === event.id)
-  );
+  // Hosting events - compare with authenticated user ID
+  const hostingEvents = [...events, ...createdEvents]
+    .filter(event => user?.id && event.host === user.id.toString())
+    .filter((event, index, self) => self.findIndex(e => e.id === event.id) === index); // Remove duplicates
   
   // Past events (approved participations that are in the past)
-  const pastEvents = events.filter(event => 
-    participations[event.id] === 'approved' && new Date(event.date) < new Date()
-  );
+  const pastEvents = events
+    .filter(event => participations[event.id] === 'approved' && new Date(event.date) < new Date())
+    .filter((event, index, self) => self.findIndex(e => e.id === event.id) === index); // Remove duplicates
 
   return (
     <ScrollView style={styles.container}>
@@ -92,27 +94,67 @@ export default function MyEventsScreen() {
   );
 }
 
-const EventCard = ({ event }: { event: Event }) => (
-  <View style={styles.eventCard}>
-    <View style={styles.eventHeader}>
-      <View>
-        <Text style={styles.eventTitle}>{event.title}</Text>
-        <Text style={styles.eventCategory}>{CATEGORIES.find(c => c.id === event.category)?.name}</Text>
+const EventCard = ({ event }: { event: Event }) => {
+  // Safety check for event object
+  if (!event) {
+    console.warn('[EventCard] Received null/undefined event');
+    return (
+      <View style={styles.eventCard}>
+        <Text style={styles.eventTitle}>Invalid Event Data</Text>
       </View>
+    );
+  }
+  
+  // Safety check for event ID
+  if (!event.id) {
+    console.warn('[EventCard] Event missing ID');
+    return (
+      <View style={styles.eventCard}>
+        <Text style={styles.eventTitle}>Invalid Event ID</Text>
+      </View>
+    );
+  }
+  
+  // Safe handling of date formatting
+  let formattedDate = 'Άκυρη ημερομηνία';
+  try {
+    if (event.date instanceof Date) {
+      formattedDate = event.date.toLocaleDateString('el-GR');
+    } else if (typeof event.date === 'string') {
+      const parsedDate = new Date(event.date);
+      if (!isNaN(parsedDate.getTime())) {
+        formattedDate = parsedDate.toLocaleDateString('el-GR');
+      }
+    }
+  } catch (dateError) {
+    console.warn('[EventCard] Date formatting error for event:', event.id, dateError);
+  }
+  
+  // Safe handling of category lookup
+  const categoryName = CATEGORIES.find(c => c.id === event.category)?.name || 'Άγνωστη Κατηγορία';
+  
+  return (
+    <View style={styles.eventCard}>
+      <View style={styles.eventHeader}>
+        <View>
+          <Text style={styles.eventTitle}>{event.title || 'Χωρίς Τίτλο'}</Text>
+          <Text style={styles.eventCategory}>{categoryName}</Text>
+        </View>
+      </View>
+      <Text style={styles.eventDescription} numberOfLines={2}>{event.description || ''}</Text>
+      <View style={styles.eventDetails}>
+        <Text style={styles.eventDetail}>{formattedDate}</Text>
+        <Text style={styles.eventDetail}>{event.time || ''}</Text>
+        <Text style={styles.eventDetail}>{event.area || ''}</Text>
+      </View>
+      <Link href={`/event/${event.id}`} asChild>
+        <Pressable style={styles.eventButton}>
+          <Text style={styles.eventButtonText}>Περισσότερα</Text>
+        </Pressable>
+      </Link>
     </View>
-    <Text style={styles.eventDescription} numberOfLines={2}>{event.description}</Text>
-    <View style={styles.eventDetails}>
-      <Text style={styles.eventDetail}>{new Date(event.date).toLocaleDateString('el-GR')}</Text>
-      <Text style={styles.eventDetail}>{event.time}</Text>
-      <Text style={styles.eventDetail}>{event.area}</Text>
-    </View>
-    <Link href={`/event/${event.id}`} asChild>
-      <Pressable style={styles.eventButton}>
-        <Text style={styles.eventButtonText}>Περισσότερα</Text>
-      </Pressable>
-    </Link>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

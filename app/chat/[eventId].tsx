@@ -1,6 +1,7 @@
 import { StyleSheet, View, Text, FlatList, Pressable, TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import COLORS from '@/constants/Colors';
 import LAYOUT from '@/constants/layout';
 import { useState, useEffect, useRef } from 'react';
@@ -11,15 +12,16 @@ export default function ChatScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { events, participations, messages, addMessage } = useAppContext();
+  const { user } = useAuth();
   const { showDialog } = useDialog();
   const [newMessage, setNewMessage] = useState('');
   const flatListRef = useRef<FlatList>(null);
   
-  // Find the event by ID
-  const event = events.find(e => e.id === id);
+  // Find the event by ID (ensure proper string comparison)
+  const event = events.find(e => String(e.id) === String(id));
   
   // Filter and sort messages for this event
-  const eventMessages = sortMessagesByTimestamp(filterMessagesByEvent(messages, event?.id || ''));
+  const eventMessages = sortMessagesByTimestamp(filterMessagesByEvent(messages, event?.id ? String(event.id) : String(id)));
   
   // Handle sending a new message
   const handleSend = () => {
@@ -34,12 +36,22 @@ export default function ChatScreen() {
       return;
     }
     
+    // Check if user is authenticated before sending message
+    if (!user?.id) {
+      showDialog({
+        title: 'Σφάλμα',
+        message: 'Πρέπει να είσαι συνδεδεμένος/η για να στείλεις μήνυμα',
+        type: 'error',
+      });
+      return;
+    }
+
     // Create a new message
     const message = {
       id: Math.random().toString(36).substring(7),
       eventId: event.id,
-      userId: 'currentUserId', // In a real app, this would be the actual user ID
-      userName: 'Εσύ', // In a real app, this would be the actual user name
+      userId: user.id.toString(), // Use authenticated user ID
+      userName: user.name || 'Εσύ', // Use authenticated user name
       text: newMessage,
       timestamp: new Date(),
     };
@@ -64,29 +76,35 @@ export default function ChatScreen() {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>Το event δεν βρέθηκε</Text>
-        <Pressable style={styles.backButton} onPress={() => router.push({
-          pathname: "/event/[id]",
-          params: { id: id as string }
-        })}>
-          <Text style={styles.backButtonText}>Επιστροφή στο event</Text>
+        <Pressable style={styles.backButton} onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace("/(tabs)/home");
+          }
+        }}>
+          <Text style={styles.backButtonText}>Επιστροφή</Text>
         </Pressable>
       </View>
     );
   }
   
-  // Check if user can access chat
-  const canAccessChat = participations[event.id] === 'approved' || event.host === 'currentUserId';
+// Check if user can access chat
+    const canAccessChat = participations[event.id] === 'approved' || (user?.id && event.host === user.id.toString());
   
   // If user cannot access chat, show an error message
   if (!canAccessChat) {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>Δεν έχεις πρόσβαση στη συνομιλία αυτού του event</Text>
-        <Pressable style={styles.backButton} onPress={() => router.push({
-          pathname: "/event/[id]",
-          params: { id: id as string }
-        })}>
-          <Text style={styles.backButtonText}>Επιστροφή στο event</Text>
+        <Pressable style={styles.backButton} onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace("/(tabs)/home");
+          }
+        }}>
+          <Text style={styles.backButtonText}>Επιστροφή</Text>
         </Pressable>
       </View>
     );
@@ -101,16 +119,16 @@ export default function ChatScreen() {
         renderItem={({ item }) => (
           <View style={[
             styles.messageContainer,
-            item.userId === 'currentUserId' ? styles.ownMessageContainer : styles.otherMessageContainer
+            user?.id && item.userId === user.id.toString() ? styles.ownMessageContainer : styles.otherMessageContainer
           ]}>
             <Text style={styles.userName}>{item.userName}</Text>
             <View style={[
               styles.messageBubble,
-              item.userId === 'currentUserId' ? styles.ownMessageBubble : styles.otherMessageBubble
+              user?.id && item.userId === user.id.toString() ? styles.ownMessageBubble : styles.otherMessageBubble
             ]}>
               <Text style={[
                 styles.messageText,
-                item.userId === 'currentUserId' ? styles.ownMessageText : styles.otherMessageText
+                user?.id && item.userId === user.id.toString() ? styles.ownMessageText : styles.otherMessageText
               ]}>
                 {item.text}
               </Text>

@@ -1,6 +1,7 @@
-import { StyleSheet, View, Text, ScrollView, Pressable } from 'react-native';
-import { Link } from 'expo-router';
+import { StyleSheet, View, Text, ScrollView, Pressable, TextInput } from 'react-native';
+import { Link, useRouter } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { COLORS } from '@/constants/Colors';
 import { LAYOUT } from '@/constants/layout';
 import CATEGORIES from '@/constants/categories';
@@ -11,19 +12,43 @@ import { PareaCard } from '@/components/ui/PareaCard';
 import { PareaButton } from '@/components/ui/PareaButton';
 import { PareaChip } from '@/components/ui/PareaChip';
 import { useDialog } from '@/components/ui/PareaDialog';
+import { useState, useMemo } from 'react';
 
 export default function HomeScreen() {
   const { events, favorites, toggleFavorite } = useAppContext();
+  const { user } = useAuth();
   const { showDialog } = useDialog();
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Filter events based on search and category
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      // Search query filter
+      if (searchQuery && 
+          !event.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
+          !event.description.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Category filter
+      if (selectedCategory && event.category !== selectedCategory) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [events, searchQuery, selectedCategory]);
 
   // Filter events for "For You" section (favorited events)
-  const forYouEvents = events.filter(event => favorites.includes(event.id));
+  const forYouEvents = filteredEvents.filter(event => favorites.includes(event.id));
 
-  // Filter events for "Near You" section (all events for now)
-  const nearYouEvents = events;
+  // Filter events for "Near You" section
+  const nearYouEvents = filteredEvents;
 
   // Filter events for "This Weekend" section
-  const weekendEvents = events.filter(event => {
+  const weekendEvents = filteredEvents.filter(event => {
     const eventDate = new Date(event.date);
     const today = new Date();
     const tomorrow = new Date(today);
@@ -36,19 +61,25 @@ export default function HomeScreen() {
   });
 
   // Filter events for "First Time Friendly" section
-  const firstTimeEvents = events.filter(event => event.firstTimeFriendly);
+  const firstTimeEvents = filteredEvents.filter(event => event.firstTimeFriendly);
 
   return (
     <PareaScreen scrollable bottomSpacing>
       <View style={styles.contentContainer}>
         <PareaHeader 
-          title="Γεια σου, Βασίλη!" 
+          title={`Γεια σου, ${user?.name || 'Χρήστη'}!`} 
           subtitle="Τι θα κάνουμε;"
         />
         
         {/* Search Bar */}
         <PareaCard style={styles.searchContainer}>
-          <Text style={styles.searchPlaceholder}>Αναζήτηση events...</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Αναζήτηση events..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={COLORS.textTertiary}
+          />
         </PareaCard>
         
         {/* Hero Card */}
@@ -75,10 +106,17 @@ export default function HomeScreen() {
           style={styles.categoryChipsContainer}
           contentContainerStyle={styles.categoryChipsContent}
         >
+          <PareaChip 
+            label="Όλα" 
+            onPress={() => setSelectedCategory(null)}
+            selected={!selectedCategory}
+          />
           {CATEGORIES.map((category) => (
             <PareaChip 
               key={category.id} 
               label={`${category.icon} ${category.name}`} 
+              onPress={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
+              selected={selectedCategory === category.id}
             />
           ))}
         </ScrollView>
@@ -104,11 +142,17 @@ const Section = ({ title, events, onToggleFavorite }: {
   events: Event[]; 
   onToggleFavorite: (id: string) => void;
 }) => {
+  const router = useRouter();
   const { favorites } = useAppContext();
   
   return (
     <View style={styles.sectionContainer}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Pressable onPress={() => router.push('/(tabs)/explore')}>
+          <Text style={styles.seeMoreText}>Περισσότερα</Text>
+        </Pressable>
+      </View>
       {events.length > 0 ? (
         events.map(event => (
           <EventCard 
@@ -193,6 +237,9 @@ const styles = StyleSheet.create({
     height: 52,
     justifyContent: 'center',
   },
+  searchInput: {
+    color: COLORS.textPrimary,
+  },
   searchPlaceholder: {
     color: COLORS.textTertiary,
   },
@@ -226,10 +273,19 @@ const styles = StyleSheet.create({
   sectionContainer: {
     marginBottom: LAYOUT.spacing.xl,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: LAYOUT.spacing.md,
+  },
   sectionTitle: {
     ...LAYOUT.typography.headlineSmall,
     color: COLORS.textPrimary,
-    marginBottom: LAYOUT.spacing.md,
+  },
+  seeMoreText: {
+    color: COLORS.primary,
+    ...LAYOUT.typography.labelLarge,
   },
   emptyStateCard: {
     padding: LAYOUT.spacing.lg,

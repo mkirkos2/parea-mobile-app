@@ -1,16 +1,53 @@
-import { StyleSheet, View, Text, ScrollView, Pressable } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Pressable, TextInput } from 'react-native';
 import { Link } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import COLORS from '@/constants/Colors';
 import LAYOUT from '@/constants/layout';
 import CATEGORIES from '@/constants/categories';
 import { Event } from '@/types';
+import { useState, useMemo } from 'react';
 
 export default function ExploreScreen() {
   const { events, favorites, toggleFavorite } = useAppContext();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [participationMode, setParticipationMode] = useState<string | null>(null);
+  const [firstTimeFriendlyOnly, setFirstTimeFriendlyOnly] = useState(false);
+  const [freeOnly, setFreeOnly] = useState(false);
   
-  // For demo purposes, showing all events
-  const filteredEvents = events;
+  // Filter events based on all criteria
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      // Search query filter
+      if (searchQuery && 
+          !event.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
+          !event.description.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Category filter
+      if (selectedCategory && event.category !== selectedCategory) {
+        return false;
+      }
+      
+      // Participation mode filter
+      if (participationMode && event.participationMode !== participationMode) {
+        return false;
+      }
+      
+      // First time friendly filter
+      if (firstTimeFriendlyOnly && !event.firstTimeFriendly) {
+        return false;
+      }
+      
+      // Free events filter
+      if (freeOnly && event.cost > 0) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [events, searchQuery, selectedCategory, participationMode, firstTimeFriendlyOnly, freeOnly]);
 
   return (
     <ScrollView style={styles.container}>
@@ -18,32 +55,89 @@ export default function ExploreScreen() {
       
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchPlaceholder}>Αναζήτηση events...</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Αναζήτηση events..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor={COLORS.textTertiary}
+        />
       </View>
       
-      {/* Filters */}
+      {/* Category Filters */}
       <View style={styles.filtersContainer}>
-        <Text style={styles.filterTitle}>Φίλτρα:</Text>
+        <Text style={styles.filterTitle}>Κατηγορίες:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipsContainer}>
-          <View style={styles.filterChip}>
-            <Text style={styles.filterChipText}>Όλα</Text>
-          </View>
-          <View style={styles.filterChip}>
-            <Text style={styles.filterChipText}>Ανοιχτά</Text>
-          </View>
-          <View style={styles.filterChip}>
-            <Text style={styles.filterChipText}>Με έγκριση</Text>
-          </View>
-          <View style={styles.filterChip}>
-            <Text style={styles.filterChipText}>Δωρεάν</Text>
-          </View>
-          <View style={styles.filterChip}>
-            <Text style={styles.filterChipText}>Ιδανικά για πρώτη φορά</Text>
-          </View>
+          <Pressable 
+            style={[styles.filterChip, !selectedCategory && styles.activeFilterChip]}
+            onPress={() => setSelectedCategory(null)}
+          >
+            <Text style={[styles.filterChipText, !selectedCategory && styles.activeFilterChipText]}>Όλα</Text>
+          </Pressable>
+          {CATEGORIES.map(category => (
+            <Pressable 
+              key={category.id}
+              style={[styles.filterChip, selectedCategory === category.id && styles.activeFilterChip]}
+              onPress={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
+            >
+              <Text style={[styles.filterChipText, selectedCategory === category.id && styles.activeFilterChipText]}>
+                {category.name}
+              </Text>
+            </Pressable>
+          ))}
         </ScrollView>
-        <Pressable style={styles.clearFiltersButton}>
-          <Text style={styles.clearFiltersText}>Καθαρισμός φίλτρων</Text>
-        </Pressable>
+      </View>
+      
+      {/* Additional Filters */}
+      <View style={styles.filtersContainer}>
+        <Text style={styles.filterTitle}>Επιπλέον φίλτρα:</Text>
+        <View style={styles.filterOptionsContainer}>
+          <Pressable 
+            style={[styles.filterOption, participationMode === 'open' && styles.activeFilterOption]}
+            onPress={() => setParticipationMode(participationMode === 'open' ? null : 'open')}
+          >
+            <Text style={[styles.filterOptionText, participationMode === 'open' && styles.activeFilterOptionText]}>
+              Ανοιχτά
+            </Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.filterOption, participationMode === 'approval' && styles.activeFilterOption]}
+            onPress={() => setParticipationMode(participationMode === 'approval' ? null : 'approval')}
+          >
+            <Text style={[styles.filterOptionText, participationMode === 'approval' && styles.activeFilterOptionText]}>
+              Με έγκριση
+            </Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.filterOption, freeOnly && styles.activeFilterOption]}
+            onPress={() => setFreeOnly(!freeOnly)}
+          >
+            <Text style={[styles.filterOptionText, freeOnly && styles.activeFilterOptionText]}>
+              Δωρεάν
+            </Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.filterOption, firstTimeFriendlyOnly && styles.activeFilterOption]}
+            onPress={() => setFirstTimeFriendlyOnly(!firstTimeFriendlyOnly)}
+          >
+            <Text style={[styles.filterOptionText, firstTimeFriendlyOnly && styles.activeFilterOptionText]}>
+              Ιδανικά για πρώτη φορά
+            </Text>
+          </Pressable>
+        </View>
+        {(selectedCategory || participationMode || firstTimeFriendlyOnly || freeOnly) && (
+          <Pressable 
+            style={styles.clearFiltersButton}
+            onPress={() => {
+              setSelectedCategory(null);
+              setParticipationMode(null);
+              setFirstTimeFriendlyOnly(false);
+              setFreeOnly(false);
+            }}
+          >
+            <Text style={styles.clearFiltersText}>Καθαρισμός φίλτρων</Text>
+          </Pressable>
+        )}
       </View>
       
       {/* Events List */}
@@ -114,6 +208,9 @@ const styles = StyleSheet.create({
     padding: LAYOUT.spacing.md,
     marginBottom: 16,
   },
+  searchInput: {
+    color: COLORS.textPrimary,
+  },
   searchPlaceholder: {
     color: COLORS.textTertiary,
   },
@@ -137,8 +234,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: LAYOUT.spacing.lg,
     marginRight: LAYOUT.spacing.sm,
   },
+  activeFilterChip: {
+    backgroundColor: COLORS.primary,
+  },
   filterChipText: {
     color: COLORS.textPrimary,
+  },
+  activeFilterChipText: {
+    color: COLORS.white,
+  },
+  filterOptionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  filterOption: {
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: LAYOUT.borderRadius.md,
+    paddingVertical: LAYOUT.spacing.sm,
+    paddingHorizontal: LAYOUT.spacing.md,
+    marginRight: LAYOUT.spacing.sm,
+    marginBottom: LAYOUT.spacing.sm,
+  },
+  activeFilterOption: {
+    backgroundColor: COLORS.primary,
+  },
+  filterOptionText: {
+    color: COLORS.textPrimary,
+  },
+  activeFilterOptionText: {
+    color: COLORS.white,
   },
   clearFiltersButton: {
     alignSelf: 'flex-start',
